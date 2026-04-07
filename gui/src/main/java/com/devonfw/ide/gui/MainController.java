@@ -150,8 +150,14 @@ public class MainController {
   }
 
   private void updateContext(String selectedProjectName, String selectedWorkspaceName) {
+
     try {
-      IdeGuiStateManager.getInstance().switchContext(selectedProjectName, selectedWorkspaceName);
+      //TODO: remove questions before PR
+      IdeGuiStateManager guiStateManager = IdeGuiStateManager.getInstance();
+      guiStateManager.switchContext(selectedProjectName, selectedWorkspaceName);
+      guiStateManager.getCurrentContext().question("Test yes/no question");
+      guiStateManager.getCurrentContext().askToContinue("Do you want to continue? with project {}?", selectedProjectName);
+      guiStateManager.getCurrentContext().question(new String[] { "Green", "blue", "yellow", "red" }, "Do a selection:", selectedProjectName);
     } catch (FileNotFoundException e) {
       IdeDialog errorDialog = new IdeDialog(IdeDialog.AlertType.ERROR, e.getMessage());
       errorDialog.showAndWait();
