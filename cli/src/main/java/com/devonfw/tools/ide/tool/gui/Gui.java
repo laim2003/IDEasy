@@ -75,4 +75,9 @@ public class Gui extends Commandlet {
 
     mvn.runTool(processContext, ProcessMode.DEFAULT, args);
   }
+
+  @Override
+  public boolean isIdeHomeRequired() {
+    return true;
+  }
 }

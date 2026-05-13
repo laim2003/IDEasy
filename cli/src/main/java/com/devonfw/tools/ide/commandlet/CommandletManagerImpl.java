@@ -235,21 +235,23 @@ public class CommandletManagerImpl implements CommandletManager {
   }
 
   @Override
-  public Iterator<Commandlet> findCommandlet(CliArguments arguments, CompletionCandidateCollector collector) {
+  public CommandletFinder findCommandlet(CliArguments arguments, CompletionCandidateCollector collector) {
 
     CliArgument current = arguments.current();
     if (current.isEnd()) {
-      return Collections.emptyIterator();
+      return CommandletFinder.emptyFinder();
     }
     String keyword = current.get();
     Commandlet commandlet = getCommandletByFirstKeyword(keyword);
     if ((commandlet == null) && (collector == null)) {
-      return Collections.emptyIterator();
+      return CommandletFinder.emptyFinder();
     }
-    return new CommandletFinder(commandlet, arguments.copy(), collector);
+    return new CommandletFinder(context, commandlet, arguments.copy(), collector);
   }
 
-  private final class CommandletFinder implements Iterator<Commandlet> {
+  public static final class CommandletFinder implements Iterator<Commandlet> {
+
+    private final IdeContext context;
 
     private final Commandlet firstCandidate;
 
@@ -261,10 +263,11 @@ public class CommandletManagerImpl implements CommandletManager {
 
     private Commandlet next;
 
-    private CommandletFinder(Commandlet firstCandidate, CliArguments arguments, CompletionCandidateCollector collector) {
+    public CommandletFinder(IdeContext context, Commandlet firstCandidate, CliArguments arguments, CompletionCandidateCollector collector) {
 
+      this.context = context;
       this.firstCandidate = firstCandidate;
-      this.commandletIterator = getCommandlets().iterator();
+      this.commandletIterator = context.getCommandletManager().getCommandlets().iterator();
       this.arguments = arguments;
       this.collector = collector;
       if (isSuitable(firstCandidate)) {
@@ -293,7 +296,7 @@ public class CommandletManagerImpl implements CommandletManager {
 
     private boolean isSuitable(Commandlet commandlet) {
 
-      return (commandlet != null) && (!commandlet.isIdeHomeRequired() || (context.getIdeHome() != null));
+      return (commandlet != null) && (!commandlet.isIdeRootRequired() || (context.getIdeRoot() != null));
     }
 
     private Commandlet findNext() {
@@ -319,6 +322,10 @@ public class CommandletManagerImpl implements CommandletManager {
         }
       }
       return null;
+    }
+
+    private static CommandletFinder emptyFinder() {
+      return new CommandletFinder(null, null, null, null);
     }
   }
 }

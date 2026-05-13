@@ -32,6 +32,7 @@ import com.devonfw.tools.ide.cli.CliException;
 import com.devonfw.tools.ide.commandlet.Commandlet;
 import com.devonfw.tools.ide.commandlet.CommandletManager;
 import com.devonfw.tools.ide.commandlet.CommandletManagerImpl;
+import com.devonfw.tools.ide.commandlet.CommandletManagerImpl.CommandletFinder;
 import com.devonfw.tools.ide.commandlet.ContextCommandlet;
 import com.devonfw.tools.ide.commandlet.EnvironmentCommandlet;
 import com.devonfw.tools.ide.commandlet.UpdateCommandlet;
@@ -390,9 +391,24 @@ public abstract class AbstractIdeContext implements IdeContext, IdeLogArgFormatt
     return "IDE environment variables have been set for " + formatArgument(this.ideHome) + " in workspace " + wks;
   }
 
-  private String getMessageNotInsideIdeProject() {
+  private String getMessageNotInsideIdeProject(Commandlet cmd) {
 
-    return "You are not inside an IDE project: " + formatArgument(this.cwd);
+    StringBuilder sb = new StringBuilder();
+    if (cmd != null) {
+      sb.append("Commandlet ").append(cmd.getName());
+
+      List<Property<?>> arguments = cmd.getValues().subList(1, cmd.getValues().size());
+      if (!arguments.isEmpty()) {
+        sb.append(" with arguments: ");
+
+        for (Property<?> property : arguments) {
+          sb.append(property.getNameOrAlias()).append("=").append(property.getValueAsString()).append(" ");
+        }
+      }
+      sb.append(" requires a project context. ");
+    }
+    sb.append("You are not inside an IDE project: ").append(formatArgument(this.cwd));
+    return sb.toString();
   }
 
   private String getMessageIdeRootNotFound() {
@@ -933,7 +949,7 @@ public abstract class AbstractIdeContext implements IdeContext, IdeLogArgFormatt
       IdeLogLevel.SUCCESS.log(LOG, "IDE_ROOT is set to {}", this.ideRoot);
     }
     if (this.ideHome == null) {
-      LOG.warn(getMessageNotInsideIdeProject());
+      LOG.warn(getMessageNotInsideIdeProject(null));
     } else {
       IdeLogLevel.SUCCESS.log(LOG, "IDE_HOME is set to {}", this.ideHome);
     }
@@ -1131,7 +1147,7 @@ public abstract class AbstractIdeContext implements IdeContext, IdeLogArgFormatt
     assert (this.currentStep == null);
     boolean supressStepSuccess = false;
     StepImpl step = newStep(true, "ide", (Object[]) current.asArray());
-    Iterator<Commandlet> commandletIterator = this.commandletManager.findCommandlet(arguments, null);
+    CommandletFinder commandletIterator = this.commandletManager.findCommandlet(arguments, null);
     Commandlet cmd = null;
     ValidationResult result = null;
     try {
@@ -1146,6 +1162,7 @@ public abstract class AbstractIdeContext implements IdeContext, IdeLogArgFormatt
       }
       activateLogging(cmd);
       verifyIdeMinVersion(false);
+
       if (result != null) {
         LOG.error(result.getErrorMessage());
       }
@@ -1280,7 +1297,7 @@ public abstract class AbstractIdeContext implements IdeContext, IdeLogArgFormatt
     if (result.isValid()) {
       LOG.debug("Running commandlet {}", cmd);
       if (cmd.isIdeHomeRequired() && (this.ideHome == null)) {
-        throw new CliException(getMessageNotInsideIdeProject(), ProcessResult.NO_IDE_HOME);
+        throw new CliException(getMessageNotInsideIdeProject(cmd), ProcessResult.NO_IDE_HOME);
       } else if (cmd.isIdeRootRequired() && (this.ideRoot == null)) {
         throw new CliException(getMessageIdeRootNotFound(), ProcessResult.NO_IDE_ROOT);
       }
@@ -1326,9 +1343,9 @@ public abstract class AbstractIdeContext implements IdeContext, IdeLogArgFormatt
 
 
   /**
-   * When an update is available for the settings repository, we log a message to the console, reminding the user to run {@code ide update}.
-   * This method determines the correct message to log, depending on whether the settings repository is a symlink/junction, or not.
-   * Should the user already be running the appropriate {@code ide update} command, the message is suppressed to avoid confusion.
+   * When an update is available for the settings repository, we log a message to the console, reminding the user to run {@code ide update}. This method
+   * determines the correct message to log, depending on whether the settings repository is a symlink/junction, or not. Should the user already be running the
+   * appropriate {@code ide update} command, the message is suppressed to avoid confusion.
    *
    * @param cmd the {@link Commandlet}.
    * @return {@code msg} to log to the console. {@code null} if the message is suppressed.

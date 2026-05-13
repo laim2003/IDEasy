@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import com.devonfw.tools.ide.cli.CliArguments;
+import com.devonfw.tools.ide.commandlet.CommandletManagerImpl.CommandletFinder;
 import com.devonfw.tools.ide.completion.CompletionCandidateCollector;
 import com.devonfw.tools.ide.property.KeywordProperty;
 import com.devonfw.tools.ide.property.Property;
@@ -104,6 +105,6 @@ public interface CommandletManager {
    *     legacy devonfw-ide "ide get version ..." and "ide get edition ..." - however, we redesigned our CLI to "ide get-version ..." and "ide get-edition ..."
    *     to simplify this).
    */
-  Iterator<Commandlet> findCommandlet(CliArguments arguments, CompletionCandidateCollector collector);
+  CommandletFinder findCommandlet(CliArguments arguments, CompletionCandidateCollector collector);
 
 }
