@@ -267,7 +267,11 @@ public class CommandletManagerImpl implements CommandletManager {
 
       this.context = context;
       this.firstCandidate = firstCandidate;
-      this.commandletIterator = context.getCommandletManager().getCommandlets().iterator();
+      if (this.context != null) {
+        this.commandletIterator = context.getCommandletManager().getCommandlets().iterator();
+      } else {
+        this.commandletIterator = Collections.emptyIterator();
+      }
       this.arguments = arguments;
       this.collector = collector;
       if (isSuitable(firstCandidate)) {

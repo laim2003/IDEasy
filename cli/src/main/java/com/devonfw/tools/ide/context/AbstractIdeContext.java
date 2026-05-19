@@ -393,22 +393,22 @@ public abstract class AbstractIdeContext implements IdeContext, IdeLogArgFormatt
 
   private String getMessageNotInsideIdeProject(Commandlet cmd) {
 
-    StringBuilder sb = new StringBuilder();
+    StringBuilder errorMessage = new StringBuilder();
     if (cmd != null) {
-      sb.append("Commandlet ").append(cmd.getName());
+      errorMessage.append("Commandlet ").append(cmd.getName());
 
       List<Property<?>> arguments = cmd.getValues().subList(1, cmd.getValues().size());
       if (!arguments.isEmpty()) {
-        sb.append(" with arguments: ");
+        errorMessage.append(" with arguments: ");
 
         for (Property<?> property : arguments) {
-          sb.append(property.getNameOrAlias()).append("=").append(property.getValueAsString()).append(" ");
+          errorMessage.append(property.getNameOrAlias()).append("=").append(property.getValueAsString()).append(" ");
         }
       }
-      sb.append(" requires a project context. ");
+      errorMessage.append(" requires a project context. ");
     }
-    sb.append("You are not inside an IDE project: ").append(formatArgument(this.cwd));
-    return sb.toString();
+    errorMessage.append("You are not inside an IDE project: ").append(formatArgument(this.cwd));
+    return errorMessage.toString();
   }
 
   private String getMessageIdeRootNotFound() {
