@@ -2,7 +2,6 @@ package com.devonfw.ide.gui;
 
 import java.io.FileNotFoundException;
 import java.nio.file.NotDirectoryException;
-import java.nio.file.Path;
 import java.util.List;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -44,8 +43,6 @@ public class MainController {
   private Button vsCodeOpen;
 
   private final String directoryPath;
-  private Path projectValue;
-  private Path workspaceValue;
 
   /**
    * Constructor
@@ -97,7 +94,7 @@ public class MainController {
     selectedProject.getItems().clear();
     selectedProject.getItems().addAll(projects);
 
-    selectedProject.setOnAction(actionEvent -> {
+    selectedProject.setOnAction(_ -> {
 
       setWorkspaceComboBox();
 
