@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.devonfw.tools.ide.cli.CliException;
+
 /**
  * Test of {@link VersionIdentifier}.
  */
@@ -61,7 +63,7 @@ class VersionIdentifierTest extends Assertions {
    */
   @ParameterizedTest
   // arrange
-  @ValueSource(strings = { "1.0", "0.1", "2023.08.001", "2023-06-M1", "11.0.4_11.4", "5.2.23.RELEASE" })
+  @ValueSource(strings = { "1.0", "0.1", "2023.08.001", "2023-06-M1", "11.0.4_11.4", "5.2.23.RELEASE", "8u412b08" })
   void testValid(String version) {
 
     // act
@@ -78,7 +80,7 @@ class VersionIdentifierTest extends Assertions {
    */
   @ParameterizedTest
   // arrange
-  @ValueSource(strings = { "0", "0.0", "1.0.pineapple-pen", "1.0-rc", ".1.0", "1.-0", "RC1", "Beta1", "donut", "8u412b08", "0*.0", "*0", "*.", "17.*alpha",
+  @ValueSource(strings = { "0", "0.0", "1.0.pineapple-pen", "1.0-rc", ".1.0", "1.-0", "RC1", "Beta1", "donut", "0*.0", "*0", "*.", "17.*alpha",
       "17*.1" })
   void testInvalid(String version) {
 
@@ -97,7 +99,7 @@ class VersionIdentifierTest extends Assertions {
   void testCompare() {
 
     String[] versions = { "0.1", "0.2-SNAPSHOT", "0.2-nb5", "0.2-a", "0.2-alpha1", "0.2-beta", "0.2-b2", "0.2.M1", "0.2M9", "0.2M10", "0.2-rc1", "0.2-RC2",
-        "0.2", "0.2-fix9", "0.2-hf1", "0.3", "0.3.1", "1", "1.0", "10-alpha1" };
+        "0.2", "0.2-release", "0.2-fix9", "0.2-hf1", "0.3", "0.3.1", "0.3.*", "0.3.*!", "0.*", "1", "1.0", "10-alpha2", "10-alpha*", "10.*", "*", "*!" };
     List<VersionIdentifier> vids = new ArrayList<>(versions.length);
     for (String version : versions) {
       VersionIdentifier vid = VersionIdentifier.of(version);
@@ -119,9 +121,12 @@ class VersionIdentifierTest extends Assertions {
   @Test
   void testCompareSpecial() {
 
-    assertThat(VersionIdentifier.LATEST.compareVersion(VersionIdentifier.of("2.0"))).isSameAs(VersionComparisonResult.LESS_UNSAFE);
+    assertThat(VersionIdentifier.LATEST.compareVersion(VersionIdentifier.of("2.0"))).isSameAs(VersionComparisonResult.GREATER_UNSAFE);
     assertThat(VersionIdentifier.of("2").compareVersion(VersionIdentifier.of("2.0"))).isSameAs(VersionComparisonResult.LESS);
     assertThat(VersionIdentifier.of("2.0").compareVersion(VersionIdentifier.of("2"))).isSameAs(VersionComparisonResult.GREATER);
+    assertThat(VersionIdentifier.of("2.*").compareVersion(VersionIdentifier.of("2-release"))).isSameAs(VersionComparisonResult.GREATER_UNSAFE);
+    assertThat(VersionIdentifier.of("2.*").compareVersion(VersionIdentifier.of("2.1"))).isSameAs(VersionComparisonResult.GREATER_UNSAFE);
+    assertThat(VersionIdentifier.of("2.*").compareVersion(VersionIdentifier.of("2.*!"))).isSameAs(VersionComparisonResult.LESS_UNSAFE);
   }
 
   /**
@@ -193,6 +198,8 @@ class VersionIdentifierTest extends Assertions {
     assertThat(pattern.matches(VersionIdentifier.of("17.0.alpha7"))).isFalse();
     assertThat(pattern.matches(VersionIdentifier.of("17.0-beta2"))).isFalse();
     assertThat(pattern.matches(VersionIdentifier.of("17.0-SNAPSHOT"))).isFalse();
+    pattern = VersionIdentifier.of("8*");
+    assertThat(pattern.matches(VersionIdentifier.of("8u412b08"))).isTrue();
   }
 
   /**
@@ -346,10 +353,46 @@ class VersionIdentifierTest extends Assertions {
   void testIsStable() {
 
     assertThat(VersionIdentifier.of("2025.01.002").isStable()).isTrue();
+    assertThat(VersionIdentifier.of("8u412b08").isStable()).isTrue();
     assertThat(VersionIdentifier.of("1.0-rc1").isStable()).isFalse();
     assertThat(VersionIdentifier.of("1.0-alpha1.rc2").isStable()).isFalse();
     assertThat(VersionIdentifier.LATEST.isStable()).isTrue();
     assertThat(VersionIdentifier.LATEST_UNSTABLE.isStable()).isFalse();
   }
 
+  /** Test of {@link VersionIdentifier#resolveVersionPattern(GenericVersionRange, List)} - exact version found. */
+  @Test
+  void testResolveVersionPatternVersionFound() {
+
+    final VersionIdentifier identifier = VersionIdentifier.of("2025.01.002");
+    final List<VersionIdentifier> availableVersions = List.of(identifier);
+    final VersionIdentifier resolvedVersion = VersionIdentifier.resolveVersionPattern(identifier, availableVersions);
+    assertThat(resolvedVersion).isEqualTo(identifier);
+  }
+
+  /** Test of {@link VersionIdentifier#resolveVersionPattern(GenericVersionRange, List)} - pattern version found. */
+  @Test
+  void testResolveVersionPatternVersionFoundPattern() {
+
+    final VersionIdentifier identifier = VersionIdentifier.of("2025.01.002");
+    final VersionIdentifier identifierPattern = VersionIdentifier.of("2025.01.*");
+    final List<VersionIdentifier> availableVersions = List.of(identifier);
+    final VersionIdentifier resolvedVersion = VersionIdentifier.resolveVersionPattern(identifierPattern, availableVersions);
+    assertThat(resolvedVersion).isEqualTo(identifier);
+  }
+
+  /** Test of {@link VersionIdentifier#resolveVersionPattern(GenericVersionRange, List)} - no version found with suggestions. */
+  @Test
+  void testResolveVersionPatternNoVersionFound() {
+
+    final VersionIdentifier identifier = VersionIdentifier.of("2025.01.002");
+    final VersionIdentifier identifierPattern = VersionIdentifier.of("2026.01.*");
+    final List<VersionIdentifier> availableVersions = List.of(identifier);
+    final String expectedMessage = "Could not find any version matching '" + identifierPattern
+        + "' - there are " + availableVersions.size() + " version(s) available but none matched!\nDid you mean one of: " + identifier + "?";
+    
+    assertThatThrownBy(() -> VersionIdentifier.resolveVersionPattern(identifierPattern, availableVersions))
+        .isInstanceOf(CliException.class)
+        .hasMessage(expectedMessage);
+  }
 }

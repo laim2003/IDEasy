@@ -1,5 +1,6 @@
 package com.devonfw.tools.ide.git;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import com.devonfw.tools.ide.cli.CliException;
@@ -60,6 +61,14 @@ public interface GitContext {
    *     {@code false} if no updates were detected or if no fetching was performed (e.g., the cache threshold was not met or the context is offline)
    */
   boolean fetchIfNeeded(Path repository, String remoteName, String branch);
+
+  /**
+   * @param directory the {@link Path} to the directory to check for repo status
+   * @return {@code true} if `directory` is a Git repo, {@code false} otherwise
+   */
+  default boolean isGitRepo(Path directory) {
+    return directory != null && Files.exists(directory.resolve(GIT_FOLDER));
+  }
 
   /**
    * Checks if there are updates available for the Git repository in the specified target folder by comparing the local commit hash with the remote commit

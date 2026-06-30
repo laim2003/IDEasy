@@ -15,6 +15,7 @@ import com.devonfw.tools.ide.os.SystemInfo;
 import com.devonfw.tools.ide.os.SystemInfoMock;
 import com.devonfw.tools.ide.os.WindowsHelper;
 import com.devonfw.tools.ide.os.WindowsPathSyntax;
+import com.devonfw.tools.ide.version.VersionIdentifier;
 
 /**
  * Test of {@link IdeasyCommandlet}.
@@ -130,6 +131,89 @@ class IdeasyCommandletTest extends AbstractIdeContextTest {
     assertThat(settingsPath).exists();
     assertThat(settingsPath).content().contains("\"name\" : \"Git Bash\"");
     assertThat(settingsPath).content().contains("\"guid\" : \"{2ece5bfe-50ed-5f3a-ab87-5cd4baafed2b}\"");
+  }
+
+  /**
+   * Tests if the installation on windows did not add a second `longpaths = true` entry to the `.gitconfig` file when installing IDEasy multiple times. See:
+   * <a href="https://github.com/devonfw/IDEasy/issues/1823">#1823</a> for reference.
+   */
+  @Test
+  void testInstallIdeasyTwiceDoesNotDuplicateGitLongpaths() {
+    // arrange
+    SystemInfo systemInfo = SystemInfoMock.of("windows");
+    IdeTestContext context = newContext("install");
+    context.setIdeRoot(null);
+    context.setSystemInfo(systemInfo);
+    context.getStartContext().setForceMode(true);
+    Path gitconfigPath = context.getUserHome().resolve(".gitconfig");
+    IdeasyCommandlet ideasy = new IdeasyCommandlet(context);
+    // act
+    ideasy.installIdeasy(context.getUserHome().resolve("Downloads/ide-cli"));
+    ideasy.installIdeasy(context.getUserHome().resolve("Downloads/ide-cli"));
+    // assert
+    assertThat(gitconfigPath).content().contains("[core]");
+    assertThat(gitconfigPath).content().containsOnlyOnce("longpaths = true");
+    assertThat(gitconfigPath).content().doesNotContain("longpaths = false");
+  }
+
+  /**
+   * Test of {@link IdeasyCommandlet#checkIfUpdateIsAvailable()} with same snapshot versions.
+   */
+  @Test
+  void testCheckIfUpdateIsAvailableWithSameSnapshotVersions() {
+
+    // arrange
+    IdeTestContext context = newContext("install");
+    context.getStartContext().setOfflineMode(false);
+    IdeasyCommandlet ideasy = new IdeasyCommandlet(context) {
+      @Override
+      public VersionIdentifier getInstalledVersion() {
+        return VersionIdentifier.of("2025.04.002-04_17_02-SNAPSHOT");
+      }
+
+      @Override
+      public VersionIdentifier getLatestVersion() {
+        return VersionIdentifier.of("2025.04.002-20250417.024201-5");
+      }
+    };
+
+    // act
+    boolean updateAvailable = ideasy.checkIfUpdateIsAvailable();
+
+    // assert
+    assertThat(updateAvailable).isFalse();
+    assertThat(context).logAtSuccess().hasMessage("Your are using the latest snapshot version of IDEasy and no update is available.");
+  }
+
+  /**
+   * Test of {@link IdeasyCommandlet#checkIfUpdateIsAvailable()} with different snapshot versions.
+   */
+  @Test
+  void testCheckIfUpdateIsAvailableWithDifferentSnapshotVersions() {
+
+    // arrange
+    IdeTestContext context = newContext("install");
+    context.getStartContext().setOfflineMode(false);
+    IdeasyCommandlet ideasy = new IdeasyCommandlet(context) {
+      @Override
+      public VersionIdentifier getInstalledVersion() {
+        return VersionIdentifier.of("2025.04.002-04_17_02-SNAPSHOT");
+      }
+
+      @Override
+      public VersionIdentifier getLatestVersion() {
+        return VersionIdentifier.of("2026.05.001-20260519.032313-17");
+      }
+    };
+
+    // act
+    boolean updateAvailable = ideasy.checkIfUpdateIsAvailable();
+
+    // assert
+    assertThat(updateAvailable).isTrue();
+    assertThat(context).logAtInteraction()
+        .hasMessageContaining("version 2026.05.001-20260519.032313-17 is available. Please run the following command to upgrade to the latest version:\n"
+            + "ide upgrade");
   }
 
   private void verifyInstallation(Path installationPath) {

@@ -10,11 +10,18 @@ function ide() {
       echo -e "\n\033[91mError: IDEasy failed with exit code ${return_code}\033[91m" >&2
       return ${return_code}
     fi
+    local _create_project
+    _create_project="$(_ide_create_project "$@")"
+    if [ -n "${_create_project}" ] && [ -d "${IDE_ROOT}/${_create_project}" ]; then
+      cd "${IDE_ROOT}/${_create_project}" || return 1
+    fi
   fi
+  unset IDE_HOME
+  unset WORKSPACE
   ide_env="$(ideasy ${IDE_OPTIONS} env --bash)"
   if [ $? = 0 ]; then
     eval "${ide_env}"
-    if [ $# = 0 ]; then
+    if [ $# = 0 ] && [ -n "${IDE_HOME}" ]; then
       echo "IDE environment variables have been set for ${IDE_HOME} in workspace ${WORKSPACE}"
     fi
   fi
@@ -24,7 +31,7 @@ function ide() {
 }
 
 function icd() {
-  if [ $# = 1 ] && [ "${1::1}" != "-" ]; then
+  if [ $# = 1 ] && [ "${1:0:1}" != "-" ]; then
     cd $1 || return 1
     ide
     return
@@ -49,7 +56,7 @@ function icd() {
         ;;
       -w|--workspace)
         shift
-        if [ $# != 0 ] && [ "${1::1}" != "-" ]; then
+        if [ $# != 0 ] && [ "${1:0:1}" != "-" ]; then
           icd_workspace=$1
           shift
         else
@@ -116,6 +123,32 @@ function icd() {
   return
 }
 
+_ide_create_project()
+{
+  local found_create=false
+  while [ $# != 0 ]; do
+    case "$1" in
+      create)
+        found_create=true
+        ;;
+      -*)
+        ;;
+      *)
+        if [ "${found_create}" = true ]; then
+          echo "$1"
+          return
+        fi
+        ;;
+    esac
+    shift
+  done
+}
+
+# remove ":" from word breaks so completion keeps arguments like "dependency:list" together.
+if [ -n "${COMP_WORDBREAKS:-}" ]; then
+  COMP_WORDBREAKS=${COMP_WORDBREAKS//:}
+fi
+
 _ide_completion()
 {
   set -f
@@ -124,6 +157,15 @@ _ide_completion()
   else
     COMPREPLY=( $(ideasy -q complete ${COMP_WORDS[@]:1}) )
   fi
+
+  # keywords ending with "=" remove whitespace
+  for reply in "${COMPREPLY[@]}"; do
+    if [[ "${reply}" == *= ]]; then
+      compopt -o nospace
+      break
+    fi
+  done
+
   set +f
 }
 

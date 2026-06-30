@@ -1,5 +1,6 @@
 package com.devonfw.tools.ide.commandlet;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -8,7 +9,6 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.devonfw.tools.ide.cli.CliExitException;
 import com.devonfw.tools.ide.context.AbstractIdeContext;
 import com.devonfw.tools.ide.context.IdeContext;
 import com.devonfw.tools.ide.environment.EnvironmentVariablesType;
@@ -65,9 +65,6 @@ public final class EnvironmentCommandlet extends Commandlet {
 
   @Override
   protected void doRun() {
-    if (this.context.getIdeHome() == null) {
-      throw new CliExitException();
-    }
 
     boolean winCmd = false;
     WindowsPathSyntax pathSyntax = null;
@@ -84,11 +81,19 @@ public final class EnvironmentCommandlet extends Commandlet {
     List<VariableLine> variables = this.context.getVariables().collectVariables();
     Map<String, VariableLine> variableMap = variables.stream().collect(Collectors.toMap(VariableLine::getName, v -> v));
 
-    EnvironmentVariableCollectorContext environmentVariableCollectorContext = new EnvironmentVariableCollectorContext(variableMap,
-        new VariableSource(EnvironmentVariablesType.TOOL, this.context.getSoftwarePath()), pathSyntax);
-    setEnvironmentVariablesInLocalTools(environmentVariableCollectorContext);
+    Path softwarePath = this.context.getSoftwarePath();
+    if (softwarePath != null) {
+      EnvironmentVariableCollectorContext environmentVariableCollectorContext = new EnvironmentVariableCollectorContext(variableMap,
+          new VariableSource(EnvironmentVariablesType.TOOL, softwarePath), pathSyntax);
+      setEnvironmentVariablesInLocalTools(environmentVariableCollectorContext);
+    }
 
     printLines(variableMap, winCmd);
+
+    // Bash completions must be printed after the environment variables because they may reference variables such as TERRAFORM_HOME.
+    if (this.bash.isTrue()) {
+      printBashCompletions();
+    }
   }
 
   private void printLines(Map<String, VariableLine> variableMap, boolean winCmd) {
@@ -148,6 +153,30 @@ public final class EnvironmentCommandlet extends Commandlet {
           }
         } catch (Exception e) {
           LOG.warn("An error occurred while setting the environment variables in local tools:", e);
+        }
+      }
+    }
+  }
+
+  /**
+   * Prints optional Bash completion setup commands for installed local tools.
+   * <p>
+   * These lines are only emitted for {@code env --bash}. The IDEasy shell wrapper evaluates this output, so tools can dynamically register completions without
+   * modifying user files such as {@code ~/.bashrc}.
+   */
+  private void printBashCompletions() {
+
+    for (Commandlet commandlet : this.context.getCommandletManager().getCommandlets()) {
+      if (commandlet instanceof LocalToolCommandlet tool) {
+        try {
+          if (tool.isInstalled()) {
+            String bashCompletion = tool.getBashCompletion();
+            if ((bashCompletion != null) && !bashCompletion.isBlank()) {
+              IdeLogLevel.PROCESSABLE.log(LOG, bashCompletion);
+            }
+          }
+        } catch (Exception e) {
+          LOG.warn("An error occurred while collecting Bash completion for tool {}.", tool.getName(), e);
         }
       }
     }

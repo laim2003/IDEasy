@@ -17,10 +17,11 @@ import org.slf4j.event.Level;
 import com.devonfw.tools.ide.commandlet.Commandlet;
 import com.devonfw.tools.ide.common.Tag;
 import com.devonfw.tools.ide.common.Tags;
+import com.devonfw.tools.ide.completion.AutoCompletionRegistry;
+import com.devonfw.tools.ide.completion.CompletionCandidateCollector;
 import com.devonfw.tools.ide.context.IdeContext;
 import com.devonfw.tools.ide.environment.EnvironmentVariables;
 import com.devonfw.tools.ide.environment.EnvironmentVariablesFiles;
-import com.devonfw.tools.ide.io.FileCopyMode;
 import com.devonfw.tools.ide.log.IdeLogLevel;
 import com.devonfw.tools.ide.nls.NlsBundle;
 import com.devonfw.tools.ide.os.MacOsHelper;
@@ -29,7 +30,8 @@ import com.devonfw.tools.ide.process.ProcessContext;
 import com.devonfw.tools.ide.process.ProcessErrorHandling;
 import com.devonfw.tools.ide.process.ProcessMode;
 import com.devonfw.tools.ide.process.ProcessResult;
-import com.devonfw.tools.ide.property.StringProperty;
+import com.devonfw.tools.ide.property.Property;
+import com.devonfw.tools.ide.property.ToolArgumentsProperty;
 import com.devonfw.tools.ide.security.ToolVersionChoice;
 import com.devonfw.tools.ide.security.ToolVulnerabilities;
 import com.devonfw.tools.ide.step.Step;
@@ -54,11 +56,16 @@ public abstract class ToolCommandlet extends Commandlet implements Tags {
   private final Set<Tag> tags;
 
   /** The commandline arguments to pass to the tool. */
-  public final StringProperty arguments;
+  public final ToolArgumentsProperty arguments;
 
   private Path executionDirectory;
 
   private MacOsHelper macOsHelper;
+
+  /**
+   * Registry for tool-specific auto-completion candidates.
+   */
+  private AutoCompletionRegistry autoCompletionRegistry;
 
   /**
    * The constructor.
@@ -73,8 +80,45 @@ public abstract class ToolCommandlet extends Commandlet implements Tags {
     this.tool = tool;
     this.tags = tags;
     addKeyword(tool);
-    this.arguments = new StringProperty("", false, true, "args");
+    this.arguments = new ToolArgumentsProperty("", false, true, "args");
     initProperties();
+  }
+
+  /**
+   * Gets the auto-completion registry for this tool.
+   *
+   * @return the {@link AutoCompletionRegistry}.
+   */
+  protected AutoCompletionRegistry getAutoCompletionRegistry() {
+
+    if (this.autoCompletionRegistry == null) {
+      this.autoCompletionRegistry = new AutoCompletionRegistry();
+      initAutoCompletionRegistry(this.autoCompletionRegistry);
+    }
+
+    return this.autoCompletionRegistry;
+  }
+
+
+  /**
+   * Initializes the auto-completion registry for this tool.
+   *
+   * @param registry the {@link AutoCompletionRegistry} to initialize.
+   */
+  protected void initAutoCompletionRegistry(AutoCompletionRegistry registry) {
+    // default empty
+  }
+
+  /**
+   * Completes tool-specific arguments.
+   *
+   * @param arg the current argument to complete.
+   * @param collector the {@link CompletionCandidateCollector}.
+   * @param property the {@link Property} that triggered completion.
+   */
+  public void completeToolArguments(String arg, CompletionCandidateCollector collector, Property<?> property) {
+
+    getAutoCompletionRegistry().complete(arg, collector, property, this);
   }
 
   /**
@@ -369,13 +413,20 @@ public abstract class ToolCommandlet extends Commandlet implements Tags {
       edition = new ToolEdition(this.tool, getConfiguredEdition());
       requested = new ToolEditionAndVersion(edition);
       request.setRequested(requested);
+
     } else {
       edition = requested.getEdition();
       if (edition == null) {
+        // If no edition was specified, set it to the configured one
         edition = new ToolEdition(this.tool, getConfiguredEdition());
         requested.setEdition(edition);
       }
     }
+
+    // Adjust edition if necessary based on requested version. This is needed for tools like IntelliJ where we may need to automatically switch editions
+    requested = adjustRequestedEdition(requested);
+    edition = requested.getEdition();
+
     GenericVersionRange version = requested.getVersion();
     if (version == null) {
       version = getConfiguredVersion();
@@ -398,6 +449,19 @@ public abstract class ToolCommandlet extends Commandlet implements Tags {
       requested.setResolvedVersion(resolvedVersion);
     }
   }
+
+  /**
+   * Hook for subclasses to adjust the requested tool edition before the version is finalized.
+   *
+   * @param requested the requested {@link ToolEditionAndVersion}
+   * @return the given or trgansformed {@link ToolEditionAndVersion}
+   */
+  protected ToolEditionAndVersion adjustRequestedEdition(ToolEditionAndVersion requested) {
+
+    // default no-op
+    return requested;
+  }
+
 
   private void completeRequestToolPath(ToolInstallRequest request) {
 
@@ -520,13 +584,7 @@ public abstract class ToolCommandlet extends Commandlet implements Tags {
   protected ToolInstallation createToolInstallation(Path rootDir, Path linkDir, Path binDir, VersionIdentifier version, boolean newInstallation,
       EnvironmentContext environmentContext, boolean additionalInstallation) {
 
-    if (linkDir != rootDir) {
-      assert (!linkDir.equals(rootDir));
-      Path toolVersionFile = rootDir.resolve(IdeContext.FILE_SOFTWARE_VERSION);
-      if (Files.exists(toolVersionFile)) {
-        this.context.getFileAccess().copy(toolVersionFile, linkDir, FileCopyMode.COPY_FILE_OVERRIDE);
-      }
-    }
+    // do not copy the version file into macOS .app bundles: changing the bundle after codesigning breaks the seal.
     ToolInstallation toolInstallation = new ToolInstallation(rootDir, linkDir, binDir, version, newInstallation);
     setEnvironment(environmentContext, toolInstallation, additionalInstallation);
     return toolInstallation;

@@ -8,6 +8,24 @@ import com.devonfw.tools.ide.url.updater.GithubUrlTagUpdater;
  */
 public class VsCodeUrlUpdater extends GithubUrlTagUpdater {
 
+  private static final String DOWNLOAD_BASE_URL = "https://update.code.visualstudio.com";
+
+  /**
+   * The Constructor.
+   */
+  public VsCodeUrlUpdater() {
+    super(DOWNLOAD_BASE_URL);
+  }
+
+  /**
+   * Package-private constructor used for testing {@link VsCodeUrlUpdater}.
+   *
+   * @param baseUrl mock url used as download and version base.
+   */
+  VsCodeUrlUpdater(String baseUrl) {
+    super(baseUrl, baseUrl);
+  }
+
   @Override
   public String getTool() {
 
@@ -21,18 +39,13 @@ public class VsCodeUrlUpdater extends GithubUrlTagUpdater {
   }
 
   @Override
-  protected String getDownloadBaseUrl() {
-
-    return "https://update.code.visualstudio.com";
-  }
-
-  @Override
   protected void addVersion(UrlVersion urlVersion) {
 
     String baseUrl = getDownloadBaseUrl() + "/${version}/";
     doAddVersion(urlVersion, baseUrl + "win32-x64-archive/stable", WINDOWS);
     doAddVersion(urlVersion, baseUrl + "linux-x64/stable", LINUX);
     doAddVersion(urlVersion, baseUrl + "darwin/stable", MAC);
+    doAddVersion(urlVersion, baseUrl + "darwin-arm64/stable", MAC, ARM64);
   }
 
   @Override
@@ -52,7 +65,11 @@ public class VsCodeUrlUpdater extends GithubUrlTagUpdater {
 
   @Override
   public String getCpeProduct() {
-    return "vscode";
+    return "visual_studio_code";
   }
 
+  @Override
+  protected void initCpe(CpeRegistry cpe) {
+    cpe.addVendor("microsoft").addProduct("vscode").addProduct("visual_studio_code");
+  }
 }

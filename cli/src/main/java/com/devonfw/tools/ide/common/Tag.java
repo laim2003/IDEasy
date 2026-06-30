@@ -105,6 +105,9 @@ public final class Tag {
   /** {@link Tag} for VS-Code. */
   public static final Tag VS_CODE = create("vscode", IDE, false, "visualstudiocode");
 
+  /** {@link Tag} for Spyder. */
+  public static final Tag SPYDER = create("spyder", IDE, false, new String[0], PYTHON);
+
   /** {@link Tag} for (code-)generators (including template-engines, etc.). */
   public static final Tag GENERATOR = create("generator", ROOT);
 
@@ -328,6 +331,13 @@ public final class Tag {
 
   /** {@link #Tag} for encryption. */
   public static final Tag ENCRYPTION = create("encryption", CRYPTO);
+
+  /** {@link Tag} for Nest. */
+  public static final Tag NEST = create("nest", FRAMEWORK, false, new String[] { "nestjs", "nestcli" }, TYPE_SCRIPT);
+
+  /** {@link Tag} for Task (Taskfile). */
+  public static final Tag TASK = create("task", BUILD, false, "taskfile", "gotask");
+
 
   private final String id;
 

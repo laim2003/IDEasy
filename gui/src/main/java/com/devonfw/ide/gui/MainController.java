@@ -1,10 +1,9 @@
 package com.devonfw.ide.gui;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.file.Files;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
-import java.util.stream.Stream;
+import java.util.List;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
@@ -12,8 +11,9 @@ import javafx.scene.control.ComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.devonfw.ide.gui.context.IdeGuiStateManager;
+import com.devonfw.ide.gui.context.ProjectManager;
 import com.devonfw.ide.gui.modal.IdeDialog;
-import com.devonfw.tools.ide.context.IdeContext;
 
 /**
  * Controller of the main screen of the dashboard GUI.
@@ -21,6 +21,8 @@ import com.devonfw.tools.ide.context.IdeContext;
 public class MainController {
 
   private static Logger LOG = LoggerFactory.getLogger(MainController.class);
+
+  private ProjectManager projectManager;
 
 
   @FXML
@@ -49,8 +51,11 @@ public class MainController {
    * Constructor
    */
   public MainController(String directoryPath) {
+
     LOG.debug("IDE_ROOT path={}", directoryPath);
     this.directoryPath = directoryPath;
+
+    this.projectManager = IdeGuiStateManager.getInstance().getProjectManager();
   }
 
   @FXML
@@ -83,60 +88,43 @@ public class MainController {
     openIDE("vscode");
   }
 
-
   private void setProjectsComboBox() {
 
     assert (directoryPath != null) : "directoryPath is null! Please check the setup of your environment variables (IDE_ROOT)";
 
-    selectedProject.getItems().clear();
-    Path directory = Path.of(directoryPath);
+    List<String> projects = projectManager.getProjectNames();
 
-    if (Files.exists(directory) && Files.isDirectory(directory)) {
-      try (Stream<Path> subPaths = Files.list(directory)) {
-        subPaths
-            .filter(Files::isDirectory)
-            .map(Path::getFileName)
-            .map(Path::toString)
-            .filter(name -> !name.startsWith("_"))
-            .forEach(name -> selectedProject.getItems().add(name));
-      } catch (IOException e) {
-        throw new IllegalStateException("Failed to list projects!", e);
-      }
-    }
+    selectedProject.getItems().clear();
+    selectedProject.getItems().addAll(projects);
 
     selectedProject.setOnAction(actionEvent -> {
 
-      projectValue = Path.of(selectedProject.getValue()).resolve(IdeContext.FOLDER_WORKSPACES);
+      setWorkspaceComboBox();
+
       selectedWorkspace.setDisable(false);
+    });
+  }
+
+  private void setWorkspaceComboBox() {
+
+    List<String> workspaces = null;
+    try {
+      workspaces = projectManager.getWorkspaceNames(selectedProject.getValue());
+    } catch (NotDirectoryException e) {
+      throw new RuntimeException(e);
+    }
+
+    selectedWorkspace.getItems().clear();
+    selectedWorkspace.getItems().addAll(workspaces);
+
+    selectedWorkspace.setOnAction(actionEvent -> {
+      updateContext(selectedProject.getValue(), selectedWorkspace.getValue());
+
       androidStudioOpen.setDisable(false);
       eclipseOpen.setDisable(false);
       intellijOpen.setDisable(false);
       vsCodeOpen.setDisable(false);
-      selectedWorkspace.setValue("main");
-      this.workspaceValue = Path.of("main");
-      updateContext(selectedProject.getValue(), selectedWorkspace.getValue());
     });
-  }
-
-  @FXML
-  private void setWorkspaceValue() {
-
-    selectedWorkspace.getItems().clear();
-    Path directory = Path.of(directoryPath).resolve(projectValue);
-    if (Files.exists(directory) && Files.isDirectory(directory)) {
-      try (Stream<Path> subPaths = Files.list(directory)) {
-        subPaths
-            .filter(Files::isDirectory)
-            .map(Path::getFileName)
-            .map(Path::toString)
-            .forEach(name -> selectedWorkspace.getItems().add(name));
-
-      } catch (IOException e) {
-        throw new RuntimeException("Error occurred while fetching workspace names.", e);
-      }
-    }
-    this.workspaceValue = Path.of(selectedWorkspace.getValue());
-    updateContext(selectedProject.getValue(), selectedWorkspace.getValue());
   }
 
   private void openIDE(String inIde) {
@@ -150,7 +138,6 @@ public class MainController {
   }
 
   private void updateContext(String selectedProjectName, String selectedWorkspaceName) {
-
     try {
       //TODO: remove questions before PR
       IdeGuiStateManager guiStateManager = IdeGuiStateManager.getInstance();

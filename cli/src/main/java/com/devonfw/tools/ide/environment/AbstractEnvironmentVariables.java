@@ -300,6 +300,9 @@ public abstract class AbstractEnvironmentVariables implements EnvironmentVariabl
       if ((value == null) && !ignoreDefaultValue) {
         value = var.getDefaultValueAsString(this.context);
       }
+    } else if ((value != null) && (var != null) && var.isDefaultValueAppended()) {
+      // if user has set a value, append IDEasy's default to it instead of replacing it
+      value = mergeWithDefault(value, var.getDefaultValueAsString(this.context));
     }
     if ((value != null) && (value.startsWith("~/"))) {
       value = this.context.getUserHome() + value.substring(1);
@@ -364,6 +367,30 @@ public abstract class AbstractEnvironmentVariables implements EnvironmentVariabl
    */
   private static record ResolveContext(Object rootSrc, String rootValue, boolean legacySupport, VariableSyntax syntax) {
 
+  }
+
+  /**
+   * Appends IDEasy's default to the user's input value, stripping {@code -s <path>} and {@code -Dsettings.security=<path>}.
+   *
+   * @param value the user-defined value.
+   * @param defaultValue IDEasy's default value.
+   * @return the merged value.
+   */
+  static String mergeWithDefault(String value, String defaultValue) {
+    if (defaultValue == null || defaultValue.isEmpty()) {
+      return value;
+    }
+    StringBuilder merged = new StringBuilder();
+    String[] tokens = value.trim().split("\\s+");
+    for (int i = 0; i < tokens.length; i++) {
+      String token = tokens[i];
+      if (token.equals("-s")) {
+        i++; // skip the path argument that follows
+      } else if (!token.startsWith("-Dsettings.security=")) {
+        merged.append(token).append(' ');
+      }
+    }
+    return merged.append(defaultValue).toString();
   }
 
 }

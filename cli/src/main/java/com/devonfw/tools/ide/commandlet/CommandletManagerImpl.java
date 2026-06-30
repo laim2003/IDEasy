@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import com.devonfw.tools.ide.tool.inso.Inso;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +23,9 @@ import com.devonfw.tools.ide.property.Property;
 import com.devonfw.tools.ide.tool.androidstudio.AndroidStudio;
 import com.devonfw.tools.ide.tool.aws.Aws;
 import com.devonfw.tools.ide.tool.az.Azure;
+import com.devonfw.tools.ide.tool.cdk.Cdk;
+import com.devonfw.tools.ide.tool.claude.Claude;
+import com.devonfw.tools.ide.tool.copilot.Copilot;
 import com.devonfw.tools.ide.tool.corepack.Corepack;
 import com.devonfw.tools.ide.tool.docker.Docker;
 import com.devonfw.tools.ide.tool.dotnet.DotNet;
@@ -30,6 +35,7 @@ import com.devonfw.tools.ide.tool.gh.Gh;
 import com.devonfw.tools.ide.tool.go.Go;
 import com.devonfw.tools.ide.tool.graalvm.GraalVm;
 import com.devonfw.tools.ide.tool.gradle.Gradle;
+import com.devonfw.tools.ide.tool.gui.Gui;
 import com.devonfw.tools.ide.tool.helm.Helm;
 import com.devonfw.tools.ide.tool.intellij.Intellij;
 import com.devonfw.tools.ide.tool.jasypt.Jasypt;
@@ -40,6 +46,8 @@ import com.devonfw.tools.ide.tool.kotlinc.KotlincNative;
 import com.devonfw.tools.ide.tool.kubectl.KubeCtl;
 import com.devonfw.tools.ide.tool.lazydocker.LazyDocker;
 import com.devonfw.tools.ide.tool.mvn.Mvn;
+import com.devonfw.tools.ide.tool.msvc.Msvc;
+import com.devonfw.tools.ide.tool.nest.Nest;
 import com.devonfw.tools.ide.tool.ng.Ng;
 import com.devonfw.tools.ide.tool.node.Node;
 import com.devonfw.tools.ide.tool.npm.Npm;
@@ -49,8 +57,12 @@ import com.devonfw.tools.ide.tool.pip.Pip;
 import com.devonfw.tools.ide.tool.pycharm.Pycharm;
 import com.devonfw.tools.ide.tool.python.Python;
 import com.devonfw.tools.ide.tool.quarkus.Quarkus;
+import com.devonfw.tools.ide.tool.rust.Rust;
 import com.devonfw.tools.ide.tool.sonar.Sonar;
 import com.devonfw.tools.ide.tool.spring.Spring;
+import com.devonfw.tools.ide.tool.spyder.Spyder;
+import com.devonfw.tools.ide.tool.squirrelsql.SquirrelSql;
+import com.devonfw.tools.ide.tool.task.Task;
 import com.devonfw.tools.ide.tool.terraform.Terraform;
 import com.devonfw.tools.ide.tool.tomcat.Tomcat;
 import com.devonfw.tools.ide.tool.uv.Uv;
@@ -102,6 +114,7 @@ public class CommandletManagerImpl implements CommandletManager {
     add(new StatusCommandlet(context));
     add(new RepositoryCommandlet(context));
     add(new UninstallCommandlet(context));
+    add(new LnCommandlet(context));
     add(new UpdateCommandlet(context));
     add(new UpgradeSettingsCommandlet(context));
     add(new CreateCommandlet(context));
@@ -109,6 +122,7 @@ public class CommandletManagerImpl implements CommandletManager {
     add(new InstallPluginCommandlet(context));
     add(new UninstallPluginCommandlet(context));
     add(new UpgradeCommandlet(context));
+    add(new TruststoreCommandlet(context));
     add(new Gh(context));
     add(new Helm(context));
     add(new Java(context));
@@ -116,21 +130,25 @@ public class CommandletManagerImpl implements CommandletManager {
     add(new Node(context));
     add(new Npm(context));
     add(new Mvn(context));
+    add(new Msvc(context));
     add(new GcViewer(context));
     add(new Gradle(context));
     add(new Eclipse(context));
     add(new Terraform(context));
     add(new Oc(context));
     add(new Quarkus(context));
+    add(new Rust(context));
     add(new Kotlinc(context));
     add(new KotlincNative(context));
     add(new KubeCtl(context));
     add(new Tomcat(context));
+    add(new Task(context));
     add(new Vscode(context));
     add(new Azure(context));
     add(new Aws(context));
     add(new Jmc(context));
     add(new DotNet(context));
+    add(new Inso(context));
     add(new Intellij(context));
     add(new Jasypt(context));
     add(new Docker(context));
@@ -144,9 +162,16 @@ public class CommandletManagerImpl implements CommandletManager {
     add(new Spring(context));
     add(new Uv(context));
     add(new Yarn(context));
+    add(new Copilot(context));
     add(new Corepack(context));
     add(new Pip(context));
     add(new Go(context));
+    add(new Gui(context));
+    add(new SquirrelSql(context));
+    add(new Spyder(context));
+    add(new Nest(context));
+    add(new Cdk(context));
+    add(new Claude(context));
   }
 
   /**
