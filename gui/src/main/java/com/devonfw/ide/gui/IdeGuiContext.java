@@ -45,7 +45,7 @@ public class IdeGuiContext extends AbstractIdeContext {
   @Override
   public boolean question(String question, Object... args) {
 
-    IdeDialog dialog = new IdeDialog(IdeDialog.AlertType.CONFIRMATION, question, ButtonType.YES, ButtonType.NO);
+    IdeDialog dialog = new IdeDialog(IdeDialog.AlertType.CONFIRMATION, getFormattedQuestion(question, args), ButtonType.YES, ButtonType.NO);
     dialog.showAndWait();
 
     return dialog.getResult() == ButtonType.YES;
@@ -55,7 +55,7 @@ public class IdeGuiContext extends AbstractIdeContext {
   @Override
   public <O> O question(O[] options, String question, Object... args) {
 
-    IdeDialog dialog = new IdeDialog(IdeDialog.AlertType.CONFIRMATION, question, ButtonType.APPLY, ButtonType.CANCEL);
+    IdeDialog dialog = new IdeDialog(IdeDialog.AlertType.CONFIRMATION, getFormattedQuestion(question, args), ButtonType.APPLY, ButtonType.CANCEL);
 
     dialog.getDialogPane().lookupButton(ButtonType.APPLY).setDisable(true);
 
@@ -75,6 +75,15 @@ public class IdeGuiContext extends AbstractIdeContext {
     RadioButton selectedOption = (RadioButton) group.getSelectedToggle();
 
     return selectedOption == null | dialog.getResult() == ButtonType.CANCEL ? null : (O) selectedOption.getText();
+  }
+
+  private String getFormattedQuestion(String question, Object... args) {
+
+    String formattedQuestion = question;
+    for (Object arg : args) {
+      formattedQuestion = formattedQuestion.replaceFirst("\\{}", arg.toString());
+    }
+    return formattedQuestion;
   }
 
 }
