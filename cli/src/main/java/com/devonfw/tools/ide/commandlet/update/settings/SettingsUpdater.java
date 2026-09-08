@@ -22,8 +22,8 @@ import com.devonfw.tools.ide.property.StringProperty;
  * <li>{@link #checkSettings(Path)} health check: the settings are always cloned into a temporary directory
  * first where it is verified that the git URL is valid, that cloning succeeded,
  * and that the repository actually is a settings or a combined code and settings repository.</li>
- * <li>{@link #applySettings(boolean, Path)} apply: only after the health check succeeded the settings are either pulled in place (if they were already
- * present) or the verified clone is moved to its final location.</li>
+ * <li>{@link #applySettings(SettingsHealthCheckResult)} apply: Settings are pulled in place (if they were already
+ * present)</li>
  * </ol>
  */
 public class SettingsUpdater {
@@ -126,7 +126,7 @@ public class SettingsUpdater {
       RepositoryType repositoryType = RepositoryType.ofGitRoot(tempCloneDir, this.context);
 
       if (!repositoryType.isValid()) {
-        //see @javadoc why we throw fatally here.
+
         return SettingsHealthCheckResult.ofFailed(repositoryType, MESSAGE_INVALID_REPOSITORY, tempCloneDir, false);
       }
       return SettingsHealthCheckResult.ofSuccess(repositoryType, tempCloneDir, false);
@@ -196,17 +196,6 @@ public class SettingsUpdater {
   }
 
   /**
-   * @return {@code true} if the user explicitly wants to continue with an invalid repository, {@code false} otherwise.
-   */
-  private boolean requestUserConfirmInvalidRepository(RepositoryType repositoryType, GitUrl gitUrl) {
-
-    LOG.warn("{}\nURL: {}\nDetected settings repository type: {}", MESSAGE_INVALID_REPOSITORY, gitUrl, repositoryType);
-
-    this.context.askToContinue("The update to the settings repository you are trying to apply seems to be broken. Do you want to continue anyway?");
-    return true;
-  }
-
-  /**
    * Applies the result of the {@link #checkSettings(Path)} health check by either pulling the settings in place or moving the verified clone to its final
    * location.
    *
@@ -224,21 +213,13 @@ public class SettingsUpdater {
 
     // Case 1: We performed "ide update"; so settings already existed and we just need to perform a git pull in the existing repo.
     if (onlyPull) {
-      repositoryType = RepositoryType.ofSettingsPath(context.getSettingsPath(), this.context);
-
-      if (repositoryType != RepositoryType.SETTINGS) {
-        return new SettingsUpdateResult(SettingsUpdateStatus.SETTINGS_UPDATE_FAILED,
-            repositoryType,
-            "Expected settings repository for update application, but was of type: " + repositoryType);
-      }
-
       pullSettingsAndSaveCommitId(settingsPath);
 
       repositoryType = RepositoryType.ofSettingsPath(context.getSettingsPath(), this.context);
       if (repositoryType != RepositoryType.SETTINGS) {
         return new SettingsUpdateResult(SettingsUpdateStatus.SETTINGS_UPDATE_FAILED,
             repositoryType,
-            "The updated settings repository seems to be of an invalid type: " + repositoryType);
+            "Update done, but the updated settings repository seems to be of an invalid type: " + repositoryType);
       }
 
       return new SettingsUpdateResult(SettingsUpdateStatus.SETTINGS_UPDATED, repositoryType, null);
