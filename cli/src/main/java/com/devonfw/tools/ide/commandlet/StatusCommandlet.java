@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import com.devonfw.tools.ide.context.IdeContext;
 import com.devonfw.tools.ide.environment.EnvironmentVariables;
 import com.devonfw.tools.ide.git.GitContext;
+import com.devonfw.tools.ide.git.repository.RepositoryType;
 import com.devonfw.tools.ide.log.IdeLogLevel;
 import com.devonfw.tools.ide.migration.IdeMigrator;
 import com.devonfw.tools.ide.os.SystemInfo;
@@ -105,7 +106,7 @@ public class StatusCommandlet extends Commandlet {
     } else {
       GitContext gitContext = this.context.getGitContext();
       if (gitContext.isRepositoryUpdateAvailable(settingsPath, this.context.getSettingsCommitIdPath())) {
-        if (!this.context.isCombinedSettingsCodeRepository()) {
+        if (RepositoryType.ofSettingsPath(this.context.getSettingsPath(), context) != RepositoryType.CODE_SETTINGS_COMBINED) {
           LOG.warn("Your settings are not up-to-date, please run 'ide update'.");
         }
       } else {

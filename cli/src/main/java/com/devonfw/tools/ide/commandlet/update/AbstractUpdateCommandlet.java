@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -18,13 +19,14 @@ import com.devonfw.tools.ide.commandlet.Commandlet;
 import com.devonfw.tools.ide.commandlet.CommandletManager;
 import com.devonfw.tools.ide.commandlet.CreateCommandlet;
 import com.devonfw.tools.ide.commandlet.update.settings.SettingsHealthCheckResult;
-import com.devonfw.tools.ide.commandlet.update.settings.SettingsHealthCheckStatus;
 import com.devonfw.tools.ide.commandlet.update.settings.SettingsUpdateResult;
+import com.devonfw.tools.ide.commandlet.update.settings.SettingsUpdateStatus;
 import com.devonfw.tools.ide.commandlet.update.settings.SettingsUpdater;
 import com.devonfw.tools.ide.context.AbstractIdeContext;
 import com.devonfw.tools.ide.context.IdeContext;
 import com.devonfw.tools.ide.context.IdeStartContextImpl;
 import com.devonfw.tools.ide.git.repository.RepositoryCommandlet;
+import com.devonfw.tools.ide.git.repository.RepositoryType;
 import com.devonfw.tools.ide.io.FileAccess;
 import com.devonfw.tools.ide.property.FlagProperty;
 import com.devonfw.tools.ide.property.StringProperty;
@@ -168,8 +170,9 @@ public abstract class AbstractUpdateCommandlet extends Commandlet {
    */
   protected void updateSettings() {
 
-    boolean codeRepository = this.context.isCombinedSettingsCodeRepository();
-    if (codeRepository && !(this.context.isForceMode() || this.forcePull.isTrue())) {
+    //TODO: replace getSettingsPath in CreateCommandlet
+    RepositoryType repositoryType = RepositoryType.ofSettingsPath(getSettingsPathForSettingsUpdate(), context);
+    if (repositoryType == RepositoryType.CODE_SETTINGS_COMBINED && !(this.context.isForceMode() || this.forcePull.isTrue())) {
       LOG.info("Skipping git pull in settings due to code repository. Use --force-pull to enforce pulling.");
       return;
     }
@@ -188,18 +191,7 @@ public abstract class AbstractUpdateCommandlet extends Commandlet {
     try {
       //Step 1: Perform health check
       Step healthCheckStep = this.context.newStep("Performing settings health check");
-      SettingsHealthCheckResult healthCheckResult;
-      healthCheckResult = healthCheckStep.call(() -> {
-        SettingsHealthCheckResult _healthCheckResult = settingsUpdater.checkSettings(this.context.getSettingsPath());
-        SettingsHealthCheckStatus status = _healthCheckResult.status();
-
-        if ((status == null || status == SettingsHealthCheckStatus.SETTINGS_INVALID) && !_healthCheckResult.isExistingProject()) {
-          throw new CliFatalException("Fatal error while cloning settings: The settings health check failed: " + _healthCheckResult.errorMessage());
-        } else if (status == SettingsHealthCheckStatus.SETTINGS_INVALID) {
-          throw new CliException("The settings health check failed: " + _healthCheckResult.errorMessage());
-        }
-        return _healthCheckResult;
-      }, () -> null);
+      SettingsHealthCheckResult healthCheckResult = healthCheckStep.call(() -> checkSettingsInStep(settingsUpdater), () -> null);
 
       // If the health check failed (healthCheckResult is null) the settings have not been verified, so skip applying them and fail the "Update settings"
       // step. A non-null result is only produced when the health check passed or the user explicitly chose to continue anyway (force mode), so this never
@@ -213,22 +205,7 @@ public abstract class AbstractUpdateCommandlet extends Commandlet {
 
       //Step 3: Apply (move/pull newest version) settings
       Step applySettingsStep = this.context.newStep("Applying settings");
-      applySettingsStep.run(() -> {
-
-        boolean onlyPull = healthCheckResult.status() == SettingsHealthCheckStatus.SETTINGS_VALID && healthCheckResult.isExistingProject();
-        SettingsUpdateResult settingsUpdateResult = settingsUpdater.applySettings(onlyPull,
-            healthCheckResult.temporarySettingsDirectory());
-        if (settingsUpdateResult == null) {
-
-          throw new CliException("Failed to apply the settings update due to unknown error.");
-        }
-
-        switch (settingsUpdateResult.updateStatus()) {
-          case SETTINGS_UPDATED -> applySettingsStep.success("Settings update successfully applied");
-          case SETTINGS_CLONED -> applySettingsStep.success("Settings successfully applied (cloned)");
-          case SETTINGS_UPDATE_FAILED -> throw new CliException("The settings update could not be applied: " + settingsUpdateResult.errorMessage());
-        }
-      });
+      applySettingsStep.run(() -> applySettingsUpdateInStep(settingsUpdater, healthCheckResult));
 
       //Make sure to always fail the parent step if the "Apply settings" step fails.
       if (applySettingsStep.isFailure()) {
@@ -237,6 +214,34 @@ public abstract class AbstractUpdateCommandlet extends Commandlet {
     } finally {
       // the verified clone lives across both steps and the prepareProject hook so it is only here that its lifetime ends
       settingsUpdater.cleanup();
+    }
+  }
+
+  private SettingsHealthCheckResult checkSettingsInStep(SettingsUpdater settingsUpdater) {
+    SettingsHealthCheckResult healthCheckResult = settingsUpdater.checkSettings(getSettingsPathForSettingsUpdate());
+    RepositoryType repositoryType = healthCheckResult.repositoryType();
+
+    if ((repositoryType == null || !repositoryType.isValid()) && !healthCheckResult.isExistingProject()) {
+      throw new CliFatalException("Fatal error while cloning settings: The settings health check failed: " + healthCheckResult.errorMessage());
+    } else if ((repositoryType == null || !repositoryType.isValid())) {
+      throw new CliException("The settings health check failed: " + healthCheckResult.errorMessage());
+    }
+    return healthCheckResult;
+  }
+
+  private void applySettingsUpdateInStep(SettingsUpdater settingsUpdater, SettingsHealthCheckResult healthCheckResult) {
+    SettingsUpdateResult settingsUpdateResult = settingsUpdater.applySettings(healthCheckResult);
+    if (settingsUpdateResult == null) {
+
+      throw new CliException("Failed to apply the settings update due to unknown error.");
+    }
+
+    if (Objects.requireNonNull(settingsUpdateResult.updateStatus()) == SettingsUpdateStatus.SETTINGS_UPDATE_FAILED) {
+      String errorMessage = "The settings update could not be applied: " + settingsUpdateResult.errorMessage();
+      if (!healthCheckResult.isExistingProject()) {
+        throw new CliFatalException(errorMessage);
+      }
+      throw new CliException(errorMessage);
     }
   }
 
@@ -394,5 +399,15 @@ public abstract class AbstractUpdateCommandlet extends Commandlet {
     FileAccess fileAccess = this.context.getFileAccess();
     fileAccess.writeFileContent(scriptContent, scriptPath);
     fileAccess.makeExecutable(scriptPath);
+  }
+
+  /**
+   * This method returns the path to the settings for the case of a settings update.
+   *
+   * @return The {@link Path} to the settings folder; if not overridden we will get the path from the context
+   */
+  protected Path getSettingsPathForSettingsUpdate() {
+
+    return this.context.getSettingsPath();
   }
 }

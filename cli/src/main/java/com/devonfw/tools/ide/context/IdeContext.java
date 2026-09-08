@@ -310,7 +310,8 @@ public interface IdeContext extends IdeStartContext {
   void addSecretVariable(String name);
 
   /**
-   * Registers the value of a variable as secret if the variable was marked via {@link #addSecretVariable(String)}. Has to be called before the value is logged.
+   * Registers the value of a variable as secret if the variable was marked via {@link #addSecretVariable(String)}. Has to be called before the value is
+   * logged.
    *
    * @param name the name of the variable.
    * @param value the value of the variable.
@@ -629,11 +630,6 @@ public interface IdeContext extends IdeStartContext {
    *     is in fact a git repository.
    */
   Path getSettingsGitRepository();
-
-  /**
-   * @return {@code true} if the settings repository is a symlink or a junction to a code-repository.
-   */
-  boolean isCombinedSettingsCodeRepository();
 
   /**
    * @return the {@link Path} to the file containing the last tracked commit Id of the settings repository.
