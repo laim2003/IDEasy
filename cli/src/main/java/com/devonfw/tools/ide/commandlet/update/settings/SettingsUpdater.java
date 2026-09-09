@@ -142,7 +142,6 @@ public class SettingsUpdater {
    *     {@link CliException#getExitCode() exit code} so that e.g. an abort by the user is still reported as such.
    */
   private static CliFatalException createGuaranteedFatalException(RuntimeException error) {
-    //TODO: Dont drop the exit code here
 
     if (error instanceof CliFatalException rethrow) {
       return rethrow;
